@@ -8,6 +8,10 @@ from .forms import UserRegisterForm, UserUpdateForm, ProfileUpdateForm, Question
 
 
 def home(request):
+    """
+    Главная страница - отображает список активных вопросов
+    Показывает только вопросы с истекшим временем жизни и активные
+    """
     questions = Question.objects.filter(
         is_active=True,
         expires_at__gt=timezone.now()
@@ -21,9 +25,14 @@ def home(request):
 
 @login_required
 def question_detail(request, pk):
+    """
+    Детальная страница вопроса
+    Показывает полное описание, изображение и возможность голосовать
+    """
     question = get_object_or_404(Question, pk=pk)
     has_voted = Vote.objects.filter(user=request.user, question=question).exists()
 
+    # Расчет процента голосов от общего числа пользователей
     total_users = User.objects.count()
     vote_percent = (question.votes_count / total_users * 100) if total_users > 0 else 0
 
@@ -38,12 +47,18 @@ def question_detail(request, pk):
 
 @login_required
 def vote(request, question_id):
+    """
+    Обработка голосования за вопрос
+    Один пользователь может голосовать только один раз за вопрос
+    """
     question = get_object_or_404(Question, pk=question_id)
 
+    # Проверка, не голосовал ли уже пользователь
     if Vote.objects.filter(user=request.user, question=question).exists():
         messages.error(request, 'Вы уже голосовали за этот вопрос!')
         return redirect('question_detail', pk=question_id)
 
+    # Создание записи о голосовании и увеличение счетчика
     Vote.objects.create(user=request.user, question=question)
     question.votes_count += 1
     question.save()
@@ -53,11 +68,16 @@ def vote(request, question_id):
 
 
 def register(request):
+    """
+    Регистрация нового пользователя
+    Аватар обязателен при регистрации
+    """
     if request.method == 'POST':
         form = UserRegisterForm(request.POST, request.FILES)
         if form.is_valid():
             user = form.save()
 
+            # Создание профиля пользователя с аватаром
             Profile.objects.create(
                 user=user,
                 avatar=form.cleaned_data['avatar']
@@ -72,6 +92,10 @@ def register(request):
 
 @login_required
 def profile(request):
+    """
+    Страница профиля пользователя
+    Позволяет редактировать имя, email, аватар и информацию о себе
+    """
     try:
         profile = request.user.profile
     except Profile.DoesNotExist:
@@ -99,6 +123,9 @@ def profile(request):
 
 @login_required
 def delete_profile(request):
+    """
+    Удаление профиля пользователя
+    """
     if request.method == 'POST':
         request.user.delete()
         messages.success(request, 'Ваш профиль удален.')
@@ -108,6 +135,10 @@ def delete_profile(request):
 
 @login_required
 def create_question(request):
+    """
+    Создание нового вопроса для голосования
+    Можно добавить заголовок, описание и изображение
+    """
     if request.method == 'POST':
         form = QuestionForm(request.POST, request.FILES)
         if form.is_valid():
